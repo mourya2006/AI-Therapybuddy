@@ -1,69 +1,259 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/lib/supabase";
+import { AuthScreen } from "./components/AuthScreen";
+import { Sidebar } from "./components/Sidebar";
+import { ChatArea } from "./components/ChatArea";
+import { useSpeechRecognition } from "./hooks/useSpeechRecognition";
 
 export default function Home() {
+  const [user, setUser] = useState<any>(null);
+  const [messages, setMessages] = useState<
+    { sender: "user" | "bot"; text: string }[]
+  >([]);
+  const [chatHistory, setChatHistory] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<{ id: string; name: string }[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+
+  // Auth Listener
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Fetch Chat Sessions
+  const fetchSessions = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("chat_sessions")
+      .select("id, name")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (data) {
+      setSessions(data);
+      if (!currentSessionId && data.length > 0) {
+        setCurrentSessionId(data[0].id);
+      }
+    }
+  }, [user, currentSessionId]);
+
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
+
+  // Load Active Chat Logs
+  useEffect(() => {
+    if (!currentSessionId || !user) return;
+
+    const loadActiveChat = async () => {
+      const { data } = await supabase
+        .from("chat_logs")
+        .select("*")
+        .eq("session_id", currentSessionId)
+        .order("created_at", { ascending: false });
+
+      if (data) {
+        const chronologicalChats = [...data].reverse();
+        setMessages(
+          chronologicalChats.map((row) => ({
+            sender: row.sender as "user" | "bot",
+            text: row.message,
+          }))
+        );
+        setChatHistory(
+          chronologicalChats.map((row) => ({
+            role: row.sender === "user" ? "user" : "model",
+            parts: [{ text: row.message }],
+          }))
+        );
+      }
+    };
+
+    loadActiveChat();
+  }, [currentSessionId, user]);
+
+  // Handle Speech Output Condition
+  const handleGeminiReply = useCallback(
+    async (userText: string) => {
+      if (!currentSessionId || !user) return;
+
+      stopListening();
+      setIsLoading(true);
+
+      const newMessages = [
+        ...messages,
+        { sender: "user" as const, text: userText },
+      ];
+      setMessages(newMessages);
+
+      await supabase
+        .from("chat_logs")
+        .insert([
+          {
+            sender: "user",
+            message: userText,
+            session_id: currentSessionId,
+            user_id: user.id,
+          },
+        ]);
+
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: userText, history: chatHistory }),
+        });
+        const data = await response.json();
+
+        if (data.reply) {
+          setMessages([...newMessages, { sender: "bot", text: data.reply }]);
+          setChatHistory([
+            ...chatHistory,
+            { role: "user", parts: [{ text: userText }] },
+            { role: "model", parts: [{ text: data.reply }] },
+          ]);
+
+          await supabase
+            .from("chat_logs")
+            .insert([
+              {
+                sender: "bot",
+                message: data.reply,
+                session_id: currentSessionId,
+                user_id: user.id,
+              },
+            ]);
+
+          // Speak only if not muted
+          if (!isMuted && typeof window !== "undefined") {
+            window.speechSynthesis.cancel(); // Cancel any lingering audio first
+            const utterance = new SpeechSynthesisUtterance(data.reply);
+            window.speechSynthesis.speak(utterance);
+          }
+        }
+      } catch (error) {
+        console.error("Error communicating with Gemini:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [currentSessionId, user, messages, chatHistory, isMuted]
+  );
+
+  const { isListening, toggleListening, stopListening } =
+    useSpeechRecognition(handleGeminiReply);
+
+  // Toggle Mute Handler
+  const handleToggleMute = () => {
+    setIsMuted((prev) => {
+      const nextState = !prev;
+      if (nextState && typeof window !== "undefined") {
+        window.speechSynthesis.cancel(); // Stop talking immediately if muted
+      }
+      return nextState;
+    });
+  };
+
+  // Actions
+  const handleStartNewChat = async () => {
+    const chatName = prompt(
+      "What would you like to name this chat?",
+      "New Chat"
+    );
+    if (!chatName) return;
+
+    const newSessionId = crypto.randomUUID();
+    await supabase
+      .from("chat_sessions")
+      .insert([{ id: newSessionId, user_id: user.id, name: chatName }]);
+
+    setCurrentSessionId(newSessionId);
+    setMessages([]);
+    setChatHistory([]);
+    fetchSessions();
+  };
+
+  const handleRenameSession = async (
+    id: string,
+    currentName: string,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    const newName = prompt("Rename this chat:", currentName);
+    if (newName && newName !== currentName) {
+      await supabase
+        .from("chat_sessions")
+        .update({ name: newName })
+        .eq("id", id);
+      fetchSessions();
+    }
+  };
+
+  const handleDeleteSession = async (
+    idToDelete: string,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    await supabase.from("chat_sessions").delete().eq("id", idToDelete);
+    if (currentSessionId === idToDelete) {
+      setMessages([]);
+      setChatHistory([]);
+      setCurrentSessionId("");
+    }
+    fetchSessions();
+  };
+
+  const handleSignOut = async () => {
+    if (typeof window !== "undefined") window.speechSynthesis.cancel();
+    await supabase.auth.signOut();
+    setMessages([]);
+    setSessions([]);
+    setCurrentSessionId("");
+  };
+
+  const handleToggleListening = () => {
+    if (!currentSessionId) {
+      alert("Please select or create a chat first!");
+      return;
+    }
+    toggleListening();
+  };
+
+  if (!user) return <AuthScreen />;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="flex h-screen bg-slate-950 text-white font-sans">
+      <Sidebar
+        userEmail={user.email}
+        sessions={sessions}
+        currentSessionId={currentSessionId}
+        onSelectSession={setCurrentSessionId}
+        onStartNewChat={handleStartNewChat}
+        onRenameSession={handleRenameSession}
+        onDeleteSession={handleDeleteSession}
+        onSignOut={handleSignOut}
+      />
+      <ChatArea
+        messages={messages}
+        isLoading={isLoading}
+        isListening={isListening}
+        isMuted={isMuted}
+        onToggleListening={handleToggleListening}
+        onToggleMute={handleToggleMute}
+      />
     </div>
   );
 }
