@@ -1,21 +1,21 @@
-# 🎙️ Sam — AI Voice Assistant
+# Sam — AI Voice Assistant
 
 An interactive, web-based AI voice assistant powered by Next.js, Gemini API, Supabase, and the Web Speech API. "Sam" listens to your voice commands, processes responses using Google's Gemini, speaks the answer back using speech synthesis, and saves conversation logs across user sessions.
 
 ---
 
-## ✨ Features
+## Features
 
-- **🗣️ Voice-to-Voice Interaction**: Tap to speak using the Web Speech API and receive spoken responses via Web Speech Synthesis.
-- **🔇 Audio Controls**: Quick-toggle button to mute/unmute AI voice output on demand.
-- **🔒 Authentication**: Secure user login and signup powered by Supabase Auth.
-- **📂 Chat Management**: Create, rename, delete, and easily switch between multiple chat sessions.
-- **💾 Session Persistence**: Chat histories and transcripts are saved in Supabase PostgreSQL tables.
-- **🎨 Modern Dark UI**: Built with Tailwind CSS, Lucide icons, and a clean, modular component layout.
+- **Voice-to-Voice Interaction**: Tap to speak using the Web Speech API and receive spoken responses via Web Speech Synthesis.
+- **Audio Controls**: Quick-toggle button to mute/unmute AI voice output on demand.
+- **Authentication**: Secure user login and signup powered by Supabase Auth.
+- **Chat Management**: Create, rename, delete, and easily switch between multiple chat sessions.
+- **Session Persistence**: Chat histories and transcripts are saved in Supabase PostgreSQL tables.
+- **Modern Dark UI**: Built with Tailwind CSS, Lucide icons, and a clean, modular component layout.
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Framework**: [Next.js](https://nextjs.org/) (App Router, React, TypeScript)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
@@ -26,7 +26,7 @@ An interactive, web-based AI voice assistant powered by Next.js, Gemini API, Sup
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 ├── app/
