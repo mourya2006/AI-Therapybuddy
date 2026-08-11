@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎙️ Sam — AI Voice Assistant
 
-## Getting Started
+An interactive, web-based AI voice assistant powered by Next.js, Gemini API, Supabase, and the Web Speech API. "Sam" listens to your voice commands, processes responses using Google's Gemini, speaks the answer back using speech synthesis, and saves conversation logs across user sessions.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## ✨ Features
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **🗣️ Voice-to-Voice Interaction**: Tap to speak using the Web Speech API and receive spoken responses via Web Speech Synthesis.
+- **🔇 Audio Controls**: Quick-toggle button to mute/unmute AI voice output on demand.
+- **🔒 Authentication**: Secure user login and signup powered by Supabase Auth.
+- **📂 Chat Management**: Create, rename, delete, and easily switch between multiple chat sessions.
+- **💾 Session Persistence**: Chat histories and transcripts are saved in Supabase PostgreSQL tables.
+- **🎨 Modern Dark UI**: Built with Tailwind CSS, Lucide icons, and a clean, modular component layout.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🛠️ Tech Stack
 
-## Learn More
+- **Framework**: [Next.js](https://nextjs.org/) (App Router, React, TypeScript)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **Icons**: [Lucide React](https://lucide.dev/)
+- **Database & Auth**: [Supabase](https://supabase.com/)
+- **AI Model**: [Google Gemini API](https://ai.google.dev/)
+- **Voice Capabilities**: Native Browser Web Speech API (`SpeechRecognition` & `SpeechSynthesis`)
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 📂 Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+├── app/
+│   ├── api/
+│   │   └── chat/
+│   │       └── route.ts              # Gemini API route handler
+│   ├── components/
+│   │   ├── AuthScreen.tsx            # Supabase Login & Sign-up interface
+│   │   ├── Sidebar.tsx               # Session history & user profile navigation
+│   │   └── ChatArea.tsx              # Conversation display, audio controls, & mic button
+│   ├── hooks/
+│   │   └── useSpeechRecognition.ts   # Custom hook managing Web Speech API
+│   ├── layout.tsx                    # Root layout
+│   └── page.tsx                      # Main app state orchestrator
+├── lib/
+│   └── supabase.ts                   # Supabase client configuration
+├── .env.local                        # Local environment variables
+└── README.md
